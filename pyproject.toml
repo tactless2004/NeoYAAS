@@ -4,4 +4,6 @@ version = "0.1.0"
 description = "NeoYAAS is the working title for the new version of YAAS, a data collection and orchestration platform."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "smbus2>=0.6.1",
+]
