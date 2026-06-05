@@ -372,7 +372,7 @@ class _SCD30:
             be compensated using ambient pressure.
         '''
         if not self.bus_exists():
-            logger.error("I2C Bus fails to exist, cannot read or write from I2C bus.")
+            raise RuntimeError("I2C Bus fails to exist, cannot read or write from I2C bus.")
             return
 
         
@@ -380,7 +380,7 @@ class _SCD30:
             ambient_pressure = 0
         
         if not (ambient_pressure == 0 or 700 <= ambient_pressure <= 1400):
-            logger.error("ambient_pressure parameter must be 0 or [700, 1400] mBar.") 
+            raise RuntimeError("ambient_pressure parameter must be 0 or [700, 1400] mBar.") 
 
         # clamp to uint16
         ambient_pressure = to_uint16(ambient_pressure)
@@ -396,12 +396,16 @@ class _SCD30:
             scd30_data_crc8(bytes([pressure_high_byte, pressure_low_byte]))
         ) & 0xFF # explicitly mask to 8 bits        
 
-        # Write the bytes in big endian order
-        self.bus.write_block_data(
+        write_msg = i2c_msg.write(
             SCD30_ADDR,
-            cmd_high_byte,
-            [cmd_low_byte, pressure_high_byte, pressure_low_byte, crc]
+            [
+                cmd_high_byte, cmd_low_byte,
+                pressure_high_byte, pressure_low_byte,
+                crc
+            ]
         )
+        self.bus.i2c_rdwr(write_msg)
+
     
     def stop_continuous_measurements(self):
         '''
@@ -413,11 +417,8 @@ class _SCD30:
        
         cmd_high_byte, cmd_low_byte = uint16_to_two_bytes(SCD30_STOP_CONTINUOUS_COMMAND)
 
-        self.bus.write_block_data(
-            SCD30_ADDR,
-            cmd_high_byte,
-            [cmd_low_byte]
-        )
+        write_msg = i2c_msg.write(SCD30_ADDR, [cmd_high_byte, cmd_low_byte])
+        self.bus.i2c_rdwr(write_msg)
 
     def set_measurement_interval(self, interval = 2):
         '''
@@ -439,10 +440,13 @@ class _SCD30:
         cmd_high_byte, cmd_low_byte = uint16_to_two_bytes(SCD30_SET_MEASUREMENT_INTERVAL_COMMAND)
         crc = scd30_data_crc8(bytes([data_high_byte, data_low_byte]))
 
-        self.bus.write_block_data(
+        write_msg = i2c_msg.write(
             SCD30_ADDR,
-            cmd_high_byte,
-            [cmd_low_byte, data_high_byte, data_low_byte, crc]
+            [
+                cmd_high_byte, cmd_low_byte,
+                data_high_byte, data_low_byte,
+                crc
+            ]
         )
 
     def get_ready_status(self) -> bool:
@@ -799,8 +803,4 @@ class _SCD30:
         
         cmd_msb, cmd_lsb = uint16_to_two_bytes(SCD30_SOFT_RESET_COMMAND)
         
-        self.bus.write_byte_data(
-            SCD30_ADDR,
-            cmd_msb,
-            cmd_lsb
-        )
+        write_msg = i2c_msg.write(SCD30_ADDR, [cmd_msb, cmd_lsb])
