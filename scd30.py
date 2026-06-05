@@ -21,6 +21,20 @@ from smbus2 import SMBus, i2c_msg
 # local imports
 from busmanager import BusManager
 
+# Command/Addr Constants
+SCD30_ADDR = 0x61
+SCD30_TRIGGER_CONTINUOUS_COMMAND                = 0x0010
+SCD30_STOP_CONTINUOUS_COMMAND                   = 0x0104
+SCD30_SET_MEASUREMENT_INTERVAL_COMMAND          = 0x4600
+SCD30_GET_DATA_READY_COMMAND                    = 0x0202
+SCD30_GET_READING_COMMAND                       = 0x0300
+SCD30_GET_AND_SET_ASC_COMMAND                   = 0x5306 # See section 1.4.6 of the datasheet for more information 
+SCD30_GET_AND_SET_FRC_COMMAND                   = 0x5204 # See section 1.4.6 of the datahseet for more information
+SCD30_SET_AND_GET_TEMP_OFFSET_COMMMAND          = 0x5403 # See section 1.4.7 of the datasheet for more information
+SCD30_SET_AND_GET_ALTITUDE_COMPENSATION_COMMAND = 0x5102
+SCD30_GET_FIRMWARE_VERSION_COMMAND              = 0xD100
+SCD30_SOFT_RESET_COMMAND                        = 0xD304
+
 logger = logging.getLogger(__name__)
 
 # Dataclasses
@@ -46,7 +60,7 @@ class SCD30:
         self._cached_reading: SCD30Reading | None = None
 
     # Helper methods (should not be called externally)
-    def _resolve_data(self):
+    def _refresh_cache(self):
         if self.data_ready:
             self._cached_reading = self._bus_manager.sensor_reading(
                 self._bus_manager_number,
@@ -70,6 +84,7 @@ class SCD30:
     def data_available(self):
         '''
         Alias for `SCD30.data_ready`.
+        Kept so that the API surface is compatible with implementations using the Adafruit-circuitpython package.
         '''
         return self.data_ready
 
@@ -79,7 +94,7 @@ class SCD30:
         Returns the most recent CO2 measurment from the SCD30 sensor.
         '''
         # If new data is ready, refresh the cached reading
-        self._resolve_data()
+        self._refresh_cache()
 
         # If the cached reading is not None, return the CO2 value cached
         if self._cached_reading:
@@ -100,7 +115,7 @@ class SCD30:
         Returns the most recent relative humidity value.
         '''
         if self.data_available:
-            self._resolve_data()
+            self._refresh_cache()
 
         if self._cached_reading:
             return self._cached_reading.relative_humidity
@@ -112,7 +127,7 @@ class SCD30:
         Returns the most recent relative humidity value
         '''
         if self.data_available:
-            self._resolve_data()
+            self._refresh_cache()
 
         if self._cached_reading:
             return self._cached_reading.temperature
@@ -206,13 +221,6 @@ class SCD30:
             self._SCD30.run_soft_reset
         )
     
-    def soft_reset(self):
-        '''
-        Performs a soft-reset on the SCD30, any non-volatile memory (such as altitude,
-        frc state, ASC state) will be unaffected.
-        '''
-        self.reset()
-    
     @property
     def asc_enabled(self) -> bool:
         '''
@@ -257,21 +265,6 @@ class SCD30:
             offset
         )
     
-    
-# Constants
-SCD30_ADDR = 0x61
-SCD30_TRIGGER_CONTINUOUS_COMMAND = 0x0010
-SCD30_STOP_CONTINUOUS_COMMAND = 0x0104
-SCD30_SET_MEASUREMENT_INTERVAL_COMMAND = 0x4600
-SCD30_GET_DATA_READY_COMMAND = 0x0202
-SCD30_GET_READING_COMMAND = 0x0300
-SCD30_GET_AND_SET_ASC_COMMAND = 0x5306 # See section 1.4.6 of the datasheet for more information 
-SCD30_GET_AND_SET_FRC_COMMAND = 0x5204 # See section 1.4.6 of the datahseet for more information
-SCD30_SET_AND_GET_TEMP_OFFSET_COMMMAND = 0x5403 # See section 1.4.7 of the datasheet for more information
-SCD30_SET_AND_GET_ALTITUDE_COMPENSATION_COMMAND = 0x5102
-SCD30_GET_FIRMWARE_VERSION_COMMAND = 0xD100
-SCD30_SOFT_RESET_COMMAND = 0xD304
-
 # Helper methods
 def to_uint16(value: int) -> int:
     '''
