@@ -4,11 +4,14 @@ busmanager.py serializes I2C access in a multithreaded environment.
 
 import logging
 from multiprocessing import Lock
-from typing import Callable
+from typing import Callable, TypeVar, ParamSpec
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(filename="neoyaas.log", level=logging.INFO)
 
-
+# For generic typing
+P = ParamSpec("P")
+R = TypeVar("R")
 class BusManager:
     '''
     BusManager maintains a list of n locks used for serializing multithreded access on the I2C busses  
@@ -19,23 +22,27 @@ class BusManager:
             for k in n_busses
         }
 
-    def sensor_reading(self, bus_number: int, calling_function: Callable):
+    def sensor_reading(
+            self,
+            bus_number: int,
+            calling_function: Callable[P, R],
+            *args: P.args,
+            **kwargs: P.kwargs
+        ) -> R:
         # First verify the bus is registered with the BusManager
         if bus_number not in self.locks:
-            logger.error(f"I2C Bus Number {bus_number} is not registered with this BusManager.")
-            return
+            raise RuntimeError(f"I2C Bus Number {bus_number} is not registered with this BusManager.")
         
         # Second verify the bus is registered and that the lock exists.
         lock_ref = self.locks.get(bus_number)
         if lock_ref is None:
-            logger.error(
+            raise RuntimeError(
                 f"I2C Bus Number {bus_number} is registered with this BusManager, but the Lock is None."
             )
-            return
         
         # Finally run the calling function with the bus-correct lock.
         with lock_ref:
-            return calling_function()
+            return calling_function(*args, **kwargs)
 
     
 
