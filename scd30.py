@@ -30,7 +30,7 @@ SCD30_GET_DATA_READY_COMMAND                    = 0x0202
 SCD30_GET_READING_COMMAND                       = 0x0300
 SCD30_GET_AND_SET_ASC_COMMAND                   = 0x5306 # See section 1.4.6 of the datasheet for more information 
 SCD30_GET_AND_SET_FRC_COMMAND                   = 0x5204 # See section 1.4.6 of the datahseet for more information
-SCD30_SET_AND_GET_TEMP_OFFSET_COMMMAND          = 0x5403 # See section 1.4.7 of the datasheet for more information
+SCD30_SET_AND_GET_TEMP_OFFSET_COMMAND          = 0x5403 # See section 1.4.7 of the datasheet for more information
 SCD30_SET_AND_GET_ALTITUDE_COMPENSATION_COMMAND = 0x5102
 SCD30_GET_FIRMWARE_VERSION_COMMAND              = 0xD100
 SCD30_SOFT_RESET_COMMAND                        = 0xD304
@@ -124,7 +124,7 @@ class SCD30:
     @property
     def temperature(self) -> float:
         '''
-        Returns the most recent relative humidity value
+        Returns the most recent temperature value (in degrees celcius).
         '''
         if self.data_available:
             self._refresh_cache()
@@ -340,7 +340,7 @@ class _SCD30:
             self.bus = bus
 
     def bus_exists(self) -> bool:
-        return self.bus is not None and isinstance(self.bus, SMBus)
+        return isinstance(self.bus, SMBus)
  
     def trigger_continuous_measurements(self, ambient_pressure: int | None):
         '''
@@ -495,9 +495,9 @@ class _SCD30:
             raise RuntimeError("One or more reading variables are NaN, reduce polling frequency if this happens often")
 
         return SCD30Reading(
-            co2,
-            humidity,
-            temperature
+            CO2               = co2,
+            relative_humidity = humidity,
+            temperature       = temperature
         )
     
     def get_asc_state(self) -> bool:
@@ -548,14 +548,18 @@ class _SCD30:
             logger.error("I2C Bus fails to exist, cannot read or write from I2C bus.")
             return False
         
+        cmd_msb, cmd_lsb = uint16_to_two_bytes(SCD30_GET_AND_SET_ASC_COMMAND)
+        state = int(state) & 0xFF # convert bool->int, and mask such that we only take lower 8-bits (this is almost certainly unnecessary)
+        crc = scd30_data_crc8(bytes([0x00, state]))
+
         write_msg = i2c_msg.write(
             SCD30_ADDR,
             [
-                (SCD30_GET_AND_SET_ASC_COMMAND >> 8) & 0xFF,
-                (SCD30_GET_AND_SET_ASC_COMMAND & 0xFF),
-                0x00,
-                int(state) & 0xFF,
-                scd30_data_crc8(bytes([0x00, int(state) & 0xFF]))
+                cmd_msb,
+                cmd_lsb,
+                0x00, # msb of data section is always 0x00.
+                state,
+                crc
             ]
         )
 
@@ -640,7 +644,7 @@ class _SCD30:
         if not self.bus_exists():
             raise RuntimeError("I2C Bus fails to exist, cannot read or write from I2C bus.")
         
-        cmd_high_byte, cmd_low_byte = uint16_to_two_bytes(SCD30_SET_AND_GET_TEMP_OFFSET_COMMMAND)
+        cmd_high_byte, cmd_low_byte = uint16_to_two_bytes(SCD30_SET_AND_GET_TEMP_OFFSET_COMMAND)
         
         write_msg = i2c_msg.write(SCD30_ADDR, [cmd_high_byte, cmd_low_byte])
         read_msg = i2c_msg.read(SCD30_ADDR, 3)
@@ -667,7 +671,7 @@ class _SCD30:
         if not self.bus_exists():
             raise RuntimeError("I2C Bus fails to exist, cannot read or write from I2C bus.")
         
-        cmd_high_byte, cmd_low_byte = uint16_to_two_bytes(SCD30_SET_AND_GET_TEMP_OFFSET_COMMMAND)
+        cmd_high_byte, cmd_low_byte = uint16_to_two_bytes(SCD30_SET_AND_GET_TEMP_OFFSET_COMMAND)
 
         # offset format is temperature in celcius * 100, so 1.8 celcius = 180 offset.
         offset *= 100
