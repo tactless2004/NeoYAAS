@@ -5,7 +5,7 @@ Includes:
     - an internal `_SCD30` class for i2c operations with no real abstraction
     - an `SCD30` class for simplified operations, intended for end users.
 
-The `SCD30` class synchronizes using The `BusManager` by default, the `_SCD30` class does not.
+The `SCD30` class synchronizes using The `BusManager`, the `_SCD30` class does not.
 '''
 
 # python std library
@@ -30,12 +30,235 @@ class SCD30Reading:
     relative_humidity: float
     temperature: float
 
+# Type alias for I2C bus, can be provided as int (`/dev/i2c-x`), str (full path), SMBus (will use current SMBus instance), None (will make best effort)
 I2CBus = str | int | SMBus | None
 
 class SCD30:
+    '''
+    High-level interface for using the Sensiron/Adafruit SCD30.
+    
+    Serializes concurrent I2C bus access with other devices using the BusManager.
+    '''
     def __init__(self, bus: I2CBus, bus_manager: BusManager, bus_manager_number: int):
-        self._SCD30 = _SCD30(I2CBus)
+        self._SCD30 = _SCD30(bus)
+        self._bus_manager = bus_manager
+        self._bus_manager_number = bus_manager_number
+        self._cached_reading: SCD30Reading | None
 
+    # Helper methods (should not be called externally)
+    def _resolve_data(self):
+        if self.data_ready:
+            self._cached_reading = self._bus_manager.sensor_reading(
+                self._bus_manager_number,
+                self._SCD30.get_reading
+            )
+
+    # Public API
+    @property
+    def data_ready(self):
+        '''
+        Returns true if new SCD30 data is ready.
+
+        Note: The fastest polling interval supported by the SCD30 is 2 seconds.
+        '''
+        return self._bus_manager.sensor_reading(
+            self._bus_manager_number,
+            self._SCD30.get_ready_status
+        )
+
+    @property
+    def data_available(self):
+        '''
+        Alias for `SCD30.data_ready`.
+        '''
+        return self.data_ready
+
+    @property
+    def CO2(self) -> float:
+        '''
+        Returns the most recent CO2 measurment from the SCD30 sensor.
+        '''
+        # If new data is ready, refresh the cached reading
+        if self.data_ready:
+            self._resolve_data()
+
+        # If the cached reading is not None, return the CO2 value cached
+        if self._cached_reading:
+            return self._cached_reading.CO2
+        
+        logger.warning("CO2 data requested before cache could be filled. Returning 0.0...")
+        return 0.0
+    
+    def get_CO2(self) -> float:
+        '''
+        Alias for `SCD30.CO2`
+        '''
+        return self.CO2
+
+    @property
+    def relative_humidity(self) -> float:
+        '''
+        Returns the most recent relative humidity value.
+        '''
+        if self.data_available:
+            self._resolve_data()
+
+        if self._cached_reading:
+            return self._cached_reading.relative_humidity
+        return 0.0
+
+    @property
+    def temperature(self) -> float:
+        '''
+        Returns the most recent relative humidity value
+        '''
+        if self.data_available:
+            self._resolve_data()
+
+        if self._cached_reading:
+            return self._cached_reading.temperature
+        return 0.0
+
+    @property
+    def altitude(self) -> int:
+        '''
+        Returns the NDIR altitude compensation value from the SCD30 non-volatile memory. 
+        '''
+        logger.warning(
+            "The SCD30's altitude compensation is for internal NDIR CO2 calculations.\n" +
+            "This value should not be viewed as a source of truth for altitude."
+        )
+        return self._bus_manager.sensor_reading(
+            self._bus_manager_number,
+            self._SCD30.get_altitude_compensation
+        )
+    
+    @altitude.setter
+    def altitude(self, altitude: int):
+        '''
+        Sets the NDIR altitude compensation in the SCD30 non-volatile memory.
+
+        This value will persist between power cycles.
+        '''
+        self._bus_manager.sensor_reading(
+            self._bus_manager_number,
+            self._SCD30.set_altitude_compensation,
+            altitude
+        )
+
+    
+    def set_ambient_pressure(self, ambient_pressure: int):
+        '''
+        Sets the ambient pressure used for NDIR calculations.
+
+        **Note**: Pressure should be 0 (ignored) or 700 mBar <= pressure <= 1400 mBar
+
+        **Implementation Note**: No get interface is offered because this value is provided at startup.
+        It does not persist between runs, so it is not useful to keep an interface for and cache this data.
+        '''
+        self._bus_manager.sensor_reading(
+            self._bus_manager_number,
+            self._SCD30.trigger_continuous_measurements,
+            ambient_pressure
+        )
+    
+    @property
+    def frc(self) -> int:
+        '''
+        Returns the Force Recalibration Reference value (for CO2).
+        '''
+        return self._bus_manager.sensor_reading(
+            self._bus_manager_number,
+            self._SCD30.get_frc_state
+        )
+    
+    @frc.setter
+    def frc(self, co2_reference: int):
+        '''
+        Sets the Forced Recalibration Reference value (for CO2).
+
+        Note: 400 <= `co2_reference` <= 2000
+        '''
+        self._bus_manager.sensor_reading(
+            self._bus_manager_number,
+            self._SCD30.set_frc_state,
+            co2_reference
+        )
+
+    def set_measurement_interval(self, interval: int):
+        '''
+        Sets the SCD30's internal measurement interval.
+
+        Note: 2 seconds <= interval <= 1800 seconds
+        '''
+        return self._bus_manager.sensor_reading(
+            self._bus_manager_number,
+            self._SCD30.set_measurement_interval,
+            interval
+        )
+    
+    def reset(self):
+        '''
+        Performs a soft-reset on the SCD30, any non-volatile memory (such as altitude, ambient_pressure,
+        frc state, ASC state) will be unaffected.
+        '''
+        self._bus_manager.sensor_reading(
+            self._bus_manager_number,
+            self._SCD30.run_soft_reset
+        )
+    
+    def soft_reset(self):
+        '''
+        Performs a soft-reset on the SCD30, any non-volatile memory (such as altitude, ambient_pressure,
+        frc state, ASC state) will be unaffected.
+        '''
+        self.reset()
+    
+    @property
+    def asc_enabled(self) -> bool:
+        '''
+        Automatic Self Re-calibration state.
+        '''
+        return self._bus_manager.sensor_reading(
+            self._bus_manager_number,
+            self._SCD30.get_asc_state
+        )
+    
+    @asc_enabled.setter
+    def asc_enabled(self, value: bool):
+        '''
+        Used to enable Automatic Self Recalibration (ASC). See section 1.4.6 of data sheet for more information.
+        '''
+        self._bus_manager.sensor_reading(
+            self._bus_manager_number,
+            self._SCD30.set_asc_state,
+            value
+        )
+    
+    @property
+    def temperature_offset(self) -> float:
+        '''
+        Returns the temperature offset in degrees celcius.
+
+        See section 1.4.7 of the data sheet for more information.
+        '''
+        return self._bus_manager.sensor_reading(
+            self._bus_manager_number,
+            self._SCD30.get_temperature_offset
+        )
+    
+    @temperature_offset.setter
+    def temperature_offset(self, offset: float):
+        '''
+        Setter for `SCD30.temperature_offset`.
+        '''
+        self._bus_manager.sensor_reading(
+            self._bus_manager_number,
+            self._SCD30.set_temperature_offset,
+            offset
+        )
+    
+    
 # Constants
 SCD30_ADDR = 0x61
 SCD30_TRIGGER_CONTINUOUS_COMMAND = 0x0010
@@ -253,7 +476,7 @@ class _SCD30:
         # data is ready if response == 1
         return (data_high_byte << 8) | data_low_byte == 1
 
-    def get_reading(self) -> SCD30Reading | None:
+    def get_reading(self) -> SCD30Reading:
         '''
         Gets a (CO2, Relative Humidity, Temperature) reading from the SCD30 sensor.
 
@@ -263,8 +486,8 @@ class _SCD30:
         data sheet for the SCD30 provided by Sensiron.
         '''
         if not self.bus_exists():
-            logger.error("I2C Bus fails to exist, cannot read or write from I2C bus.")
-            return
+            raise RuntimeError("I2C Bus fails to exist, cannot read or write from I2C bus.")
+            
 
         cmd_high_byte, cmd_low_byte = uint16_to_two_bytes(SCD30_GET_READING_COMMAND)
 
@@ -285,8 +508,7 @@ class _SCD30:
         temperature = parse_float_with_crc(temperature_raw)
 
         if math.isnan(co2) or math.isnan(humidity) or math.isnan(temperature):
-            logger.error("One or more reading variables are NaN, reduce polling frequency if this happens often")
-            return
+            raise RuntimeError("One or more reading variables are NaN, reduce polling frequency if this happens often")
 
         return SCD30Reading(
             co2,
@@ -418,7 +640,7 @@ class _SCD30:
 
         self.bus.i2c_rdwr(write_msg)
 
-    def get_temperature_offset(self) -> float | None:
+    def get_temperature_offset(self) -> float:
         '''
         Returns the temperature offset stored in the SCD30 non-volatile memory.
 
@@ -431,8 +653,7 @@ class _SCD30:
         Note: Internally the offset is stored as [offset (in celcius) * 100]. This method, returns the offset, so we divide by 100.
         '''
         if not self.bus_exists():
-            logger.error("I2C Bus fails to exist, cannot read or write from I2C bus.")
-            return
+            raise RuntimeError("I2C Bus fails to exist, cannot read or write from I2C bus.")
         
         cmd_high_byte, cmd_low_byte = uint16_to_two_bytes(SCD30_SET_AND_GET_TEMP_OFFSET_COMMMAND)
         
@@ -458,8 +679,7 @@ class _SCD30:
         See section 1.4.7 of the datasheet for more information.
         '''
         if not self.bus_exists():
-            logger.error("I2C Bus fails to exist, cannot read or write from I2C bus.")
-            return
+            raise RuntimeError("I2C Bus fails to exist, cannot read or write from I2C bus.")
         
         cmd_high_byte, cmd_low_byte = uint16_to_two_bytes(SCD30_SET_AND_GET_TEMP_OFFSET_COMMMAND)
 
@@ -483,7 +703,7 @@ class _SCD30:
 
         self.bus.i2c_rdwr(write_msg)
 
-    def get_altitude_compensation(self) -> int | None:
+    def get_altitude_compensation(self) -> int:
         '''
         Returns altitude compensation in meters above sea level.
 
