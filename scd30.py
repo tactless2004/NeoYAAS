@@ -338,17 +338,6 @@ class _SCD30:
 
         if isinstance(bus, SMBus):
             self.bus = bus
-    
-    def cleanup(self):
-        '''
-        Cleans up allocated resources.
-         
-        Should be run at the end of usage, but is intended for context management metods. 
-        '''
-        # Explicitly close and de-reference the bus.
-        if isinstance(self.bus, SMBus):
-            self.bus.close()
-            self.bus = None
 
     def bus_exists(self) -> bool:
         return self.bus is not None and isinstance(self.bus, SMBus)
