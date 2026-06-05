@@ -79,8 +79,7 @@ class SCD30:
         Returns the most recent CO2 measurment from the SCD30 sensor.
         '''
         # If new data is ready, refresh the cached reading
-        if self.data_ready:
-            self._resolve_data()
+        self._resolve_data()
 
         # If the cached reading is not None, return the CO2 value cached
         if self._cached_reading:
@@ -199,7 +198,7 @@ class SCD30:
     
     def reset(self):
         '''
-        Performs a soft-reset on the SCD30, any non-volatile memory (such as altitude, ambient_pressure,
+        Performs a soft-reset on the SCD30, any non-volatile memory (such as altitude,
         frc state, ASC state) will be unaffected.
         '''
         self._bus_manager.sensor_reading(
@@ -209,7 +208,7 @@ class SCD30:
     
     def soft_reset(self):
         '''
-        Performs a soft-reset on the SCD30, any non-volatile memory (such as altitude, ambient_pressure,
+        Performs a soft-reset on the SCD30, any non-volatile memory (such as altitude,
         frc state, ASC state) will be unaffected.
         '''
         self.reset()
@@ -217,7 +216,7 @@ class SCD30:
     @property
     def asc_enabled(self) -> bool:
         '''
-        Automatic Self Re-calibration state.
+        Automatic Self Recalibration state.
         '''
         return self._bus_manager.sensor_reading(
             self._bus_manager_number,
@@ -276,7 +275,7 @@ SCD30_SOFT_RESET_COMMAND = 0xD304
 # Helper methods
 def to_uint16(value: int) -> int:
     '''
-    Clamps an integer to [0, 65565] range.
+    Clamps an integer to [0, 65535] range.
 
     Raises an assertion error if this is impossible.
     '''
@@ -322,7 +321,7 @@ def parse_float_with_crc(fields: list[int]) -> float:
         )
     if scd30_data_crc8(bytes([lmsb, llsb])) != crc2:
         raise ValueError(
-            f"CRC mismatch in first word: {hex(lmsb)}, {hex(llsb)}, intended crc: {hex(crc2)}, actual: {hex(scd30_data_crc8(bytes([lmsb, llsb])))}"
+            f"CRC mismatch in second word: {hex(lmsb)}, {hex(llsb)}, intended crc: {hex(crc2)}, actual: {hex(scd30_data_crc8(bytes([lmsb, llsb])))}"
         )        
     return struct.unpack(">f", bytes([mmsb, mlsb, lmsb, llsb]))[0]
 
@@ -372,7 +371,6 @@ class _SCD30:
         '''
         if not self.bus_exists():
             raise RuntimeError("I2C Bus fails to exist, cannot read or write from I2C bus.")
-            return
 
         
         if ambient_pressure is None:
@@ -588,8 +586,7 @@ class _SCD30:
         By default there will not be an FRC value. See section 1.4.6 in the datasheet for more information.
         '''
         if not self.bus_exists():
-            logger.error("I2C Bus fails to exist, cannot read or write from I2C bus.")
-            return False
+            raise RuntimeError("I2C Bus fails to exist, cannot read or write from I2C bus.")
         
         cmd_high_byte, cmd_low_byte = uint16_to_two_bytes(SCD30_GET_AND_SET_FRC_COMMAND)
         write_msg = i2c_msg.write(SCD30_ADDR, [cmd_high_byte, cmd_low_byte])
@@ -605,7 +602,7 @@ class _SCD30:
         if crc != calculated_crc:
             logger.error(
                 f"CRC mismatch in word {msb:#04x}, {lsb:#04x}" +
-                f" received CRC: {crc:#04x}, computed CRC: {crc:#04x}"
+                f" received CRC: {crc:#04x}, computed CRC: {calculated_crc:#04x}"
             )
             return -1
         
