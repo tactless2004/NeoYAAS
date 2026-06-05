@@ -43,7 +43,7 @@ class SCD30:
         self._SCD30 = _SCD30(bus)
         self._bus_manager = bus_manager
         self._bus_manager_number = bus_manager_number
-        self._cached_reading: SCD30Reading | None
+        self._cached_reading: SCD30Reading | None = None
 
     # Helper methods (should not be called externally)
     def _resolve_data(self):
