@@ -465,7 +465,7 @@ class _SCD30:
 
         # Write to the SCD30 telling it to report data ready
         self.bus.i2c_rdwr(write_msg)
-        # sleep 3ms (per the data sheet)
+        time.sleep(0.003)
         self.bus.i2c_rdwr(read_msg)
         
         data = list(read_msg)
@@ -499,17 +499,18 @@ class _SCD30:
         read_msg = i2c_msg.read(SCD30_ADDR, 18)
 
         self.bus.i2c_rdwr(write_msg)
+        time.sleep(0.003)
         self.bus.i2c_rdwr(read_msg)
 
         read_data = list(read_msg)
 
         co2_raw = read_data[0:6]
-        humidity_raw = read_data[6:12]
-        temperature_raw = read_data[12:18]
+        temperature_raw = read_data[6:12]
+        humidity_raw = read_data[12:18]
         
         co2 = parse_float_with_crc(co2_raw)
-        humidity = parse_float_with_crc(humidity_raw)
         temperature = parse_float_with_crc(temperature_raw)
+        humidity = parse_float_with_crc(humidity_raw)
 
         if math.isnan(co2) or math.isnan(humidity) or math.isnan(temperature):
             raise RuntimeError("One or more reading variables are NaN, reduce polling frequency if this happens often")
@@ -543,6 +544,7 @@ class _SCD30:
         read_msg = i2c_msg.read(SCD30_ADDR, 3)
 
         self.bus.i2c_rdwr(write_msg)
+        time.sleep(0.003)
         self.bus.i2c_rdwr(read_msg)
 
         raw_data = list(read_msg)
@@ -595,6 +597,7 @@ class _SCD30:
         read_msg = i2c_msg.read(SCD30_ADDR, 3)
 
         self.bus.i2c_rdwr(write_msg)
+        time.sleep(0.003)
         self.bus.i2c_rdwr(read_msg)
 
         msb, lsb, crc = list(read_msg)
@@ -665,6 +668,7 @@ class _SCD30:
         read_msg = i2c_msg.read(SCD30_ADDR, 3)
 
         self.bus.i2c_rdwr(write_msg)
+        time.sleep(0.003)
         self.bus.i2c_rdwr(read_msg)
 
         msb, lsb, crc = list(read_msg)
@@ -723,6 +727,7 @@ class _SCD30:
         read_msg = i2c_msg.read(SCD30_ADDR, 3)
 
         self.bus.i2c_rdwr(write_msg)
+        time.sleep(0.003)
         self.bus.i2c_rdwr(read_msg)
 
         msb, lsb, crc = list(read_msg)
@@ -778,6 +783,7 @@ class _SCD30:
         read_msg = i2c_msg.read(SCD30_ADDR, 3)
 
         self.bus.i2c_rdwr(write_msg)
+        time.sleep(0.003)
         self.bus.i2c_rdwr(read_msg)
 
         msb, lsb, crc = list(read_msg)
@@ -804,3 +810,4 @@ class _SCD30:
         cmd_msb, cmd_lsb = uint16_to_two_bytes(SCD30_SOFT_RESET_COMMAND)
         
         write_msg = i2c_msg.write(SCD30_ADDR, [cmd_msb, cmd_lsb])
+        self.bus.i2c_rdwr(write_msg)
