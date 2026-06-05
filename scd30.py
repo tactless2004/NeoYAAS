@@ -299,7 +299,6 @@ def scd30_data_crc8(data: bytes) -> int:
     CRC-8 implementation per sensor spec.
     Polynomial: 0x31
     Initial Value: 0xFF
-    Final XOR: 0xFF
     '''
     crc = 0xFF
     for byte in data:
