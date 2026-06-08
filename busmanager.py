@@ -7,7 +7,6 @@ from multiprocessing import Lock
 from typing import Callable, TypeVar, ParamSpec
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(filename="neoyaas.log", level=logging.INFO)
 
 # For generic typing
 P = ParamSpec("P")
@@ -28,7 +27,8 @@ class BusManager:
             calling_function: Callable[P, R],
             *args: P.args,
             **kwargs: P.kwargs
-        ) -> R:
+    ) -> R:
+        
         # First verify the bus is registered with the BusManager
         if bus_number not in self.locks:
             raise RuntimeError(f"I2C Bus Number {bus_number} is not registered with this BusManager.")
