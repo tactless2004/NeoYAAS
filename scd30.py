@@ -30,7 +30,7 @@ SCD30_GET_DATA_READY_COMMAND                    = 0x0202
 SCD30_GET_READING_COMMAND                       = 0x0300
 SCD30_GET_AND_SET_ASC_COMMAND                   = 0x5306 # See section 1.4.6 of the datasheet for more information 
 SCD30_GET_AND_SET_FRC_COMMAND                   = 0x5204 # See section 1.4.6 of the datahseet for more information
-SCD30_SET_AND_GET_TEMP_OFFSET_COMMAND          = 0x5403 # See section 1.4.7 of the datasheet for more information
+SCD30_SET_AND_GET_TEMP_OFFSET_COMMAND           = 0x5403 # See section 1.4.7 of the datasheet for more information
 SCD30_SET_AND_GET_ALTITUDE_COMPENSATION_COMMAND = 0x5102
 SCD30_GET_FIRMWARE_VERSION_COMMAND              = 0xD100
 SCD30_SOFT_RESET_COMMAND                        = 0xD304
@@ -114,8 +114,7 @@ class SCD30:
         '''
         Returns the most recent relative humidity value.
         '''
-        if self.data_available:
-            self._refresh_cache()
+        self._refresh_cache()
 
         if self._cached_reading:
             return self._cached_reading.relative_humidity
@@ -126,8 +125,7 @@ class SCD30:
         '''
         Returns the most recent temperature value (in degrees celcius).
         '''
-        if self.data_available:
-            self._refresh_cache()
+        self._refresh_cache()
 
         if self._cached_reading:
             return self._cached_reading.temperature
@@ -336,7 +334,7 @@ class _SCD30:
             except FileNotFoundError:
                 logger.error(f"_SCD30 could not initialize smbus using {bus}.\nVerify {bus} exists.")
 
-        if isinstance(bus, SMBus):
+        elif isinstance(bus, SMBus):
             self.bus = bus
 
     def bus_exists(self) -> bool:
@@ -427,6 +425,7 @@ class _SCD30:
                 crc
             ]
         )
+        self.bus.i2c_rdwr(write_msg)
 
     def get_ready_status(self) -> bool:
         '''
@@ -773,7 +772,7 @@ class _SCD30:
         computed_crc = scd30_data_crc8(bytes([msb, lsb]))
         if computed_crc != crc:
             raise RuntimeError(
-                f"CRC mismatch on {msb:#04x}, {lsb:#04x}\n * Received: {crc:#04x}, Computed: {crc:#04x}"
+                f"CRC mismatch on {msb:#04x}, {lsb:#04x}\n * Received: {crc:#04x}, Computed: {computed_crc:#04x}"
             )
         
         return f"{msb}.{lsb}"
