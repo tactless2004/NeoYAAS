@@ -3,7 +3,7 @@ busmanager.py serializes I2C access in a multithreaded environment.
 '''
 
 import logging
-from multiprocessing import Lock
+from threading import Lock
 from typing import Callable, TypeVar, ParamSpec
 
 logger = logging.getLogger(__name__)
