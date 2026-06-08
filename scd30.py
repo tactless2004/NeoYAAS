@@ -62,7 +62,7 @@ class SCD30:
     # Helper methods (should not be called externally)
     def _refresh_cache(self):
         if self.data_ready:
-            self._cached_reading = self._bus_manager.sensor_reading(
+            self._cached_reading = self._bus_manager.execute_on_bus(
                 self._bus_manager_number,
                 self._SCD30.get_reading
             )
@@ -75,7 +75,7 @@ class SCD30:
 
         Note: The fastest polling interval supported by the SCD30 is 2 seconds.
         '''
-        return self._bus_manager.sensor_reading(
+        return self._bus_manager.execute_on_bus(
             self._bus_manager_number,
             self._SCD30.get_ready_status
         )
@@ -140,7 +140,7 @@ class SCD30:
             "The SCD30's altitude compensation is for internal NDIR CO2 calculations.\n" +
             "This value should not be viewed as a source of truth for altitude."
         )
-        return self._bus_manager.sensor_reading(
+        return self._bus_manager.execute_on_bus(
             self._bus_manager_number,
             self._SCD30.get_altitude_compensation
         )
@@ -152,7 +152,7 @@ class SCD30:
 
         This value will persist between power cycles.
         '''
-        self._bus_manager.sensor_reading(
+        self._bus_manager.execute_on_bus(
             self._bus_manager_number,
             self._SCD30.set_altitude_compensation,
             altitude
@@ -168,7 +168,7 @@ class SCD30:
         **Implementation Note**: No get interface is offered because this value is provided at startup.
         It does not persist between runs, so it is not useful to keep an interface for and cache this data.
         '''
-        self._bus_manager.sensor_reading(
+        self._bus_manager.execute_on_bus(
             self._bus_manager_number,
             self._SCD30.trigger_continuous_measurements,
             ambient_pressure
@@ -179,7 +179,7 @@ class SCD30:
         '''
         Returns the Force Recalibration Reference value (for CO2).
         '''
-        return self._bus_manager.sensor_reading(
+        return self._bus_manager.execute_on_bus(
             self._bus_manager_number,
             self._SCD30.get_frc_state
         )
@@ -191,7 +191,7 @@ class SCD30:
 
         Note: 400 <= `co2_reference` <= 2000
         '''
-        self._bus_manager.sensor_reading(
+        self._bus_manager.execute_on_bus(
             self._bus_manager_number,
             self._SCD30.set_frc_state,
             co2_reference
@@ -203,7 +203,7 @@ class SCD30:
 
         Note: 2 seconds <= interval <= 1800 seconds
         '''
-        return self._bus_manager.sensor_reading(
+        self._bus_manager.execute_on_bus(
             self._bus_manager_number,
             self._SCD30.set_measurement_interval,
             interval
@@ -214,7 +214,7 @@ class SCD30:
         Performs a soft-reset on the SCD30, any non-volatile memory (such as altitude,
         frc state, ASC state) will be unaffected.
         '''
-        self._bus_manager.sensor_reading(
+        self._bus_manager.execute_on_bus(
             self._bus_manager_number,
             self._SCD30.run_soft_reset
         )
@@ -224,7 +224,7 @@ class SCD30:
         '''
         Automatic Self Recalibration state.
         '''
-        return self._bus_manager.sensor_reading(
+        return self._bus_manager.execute_on_bus(
             self._bus_manager_number,
             self._SCD30.get_asc_state
         )
@@ -234,7 +234,7 @@ class SCD30:
         '''
         Used to enable Automatic Self Recalibration (ASC). See section 1.4.6 of data sheet for more information.
         '''
-        self._bus_manager.sensor_reading(
+        self._bus_manager.execute_on_bus(
             self._bus_manager_number,
             self._SCD30.set_asc_state,
             value
@@ -247,7 +247,7 @@ class SCD30:
 
         See section 1.4.7 of the data sheet for more information.
         '''
-        return self._bus_manager.sensor_reading(
+        return self._bus_manager.execute_on_bus(
             self._bus_manager_number,
             self._SCD30.get_temperature_offset
         )
@@ -257,7 +257,7 @@ class SCD30:
         '''
         Setter for `SCD30.temperature_offset`.
         '''
-        self._bus_manager.sensor_reading(
+        self._bus_manager.execute_on_bus(
             self._bus_manager_number,
             self._SCD30.set_temperature_offset,
             offset

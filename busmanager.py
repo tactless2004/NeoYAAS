@@ -15,13 +15,16 @@ class BusManager:
     '''
     BusManager maintains a list of n locks used for serializing multithreded access on the I2C busses  
     '''
-    def __init__(self, n_busses: list[int]):
+    def __init__(self, bus_ids: list[int]):
+        if bus_ids is None or not all(n >= 0 for n in bus_ids):
+            raise RuntimeError(f"Invalid I2C bus IDs: {bus_ids}.")
+
         self.locks = {
             k : Lock()
-            for k in n_busses
+            for k in bus_ids
         }
 
-    def sensor_reading(
+    def execute_on_bus(
             self,
             bus_number: int,
             calling_function: Callable[P, R],
